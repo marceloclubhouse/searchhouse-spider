@@ -6,8 +6,9 @@ import (
 
 func main() {
 	seed := []string{"https://marcelocubillos.com"}
-	spider := spider.ClubhouseSpider{}
-	spider.SetSeed(seed)
-	spider.Crawl()
+	s := spider.ClubhouseSpider{}
+	s.SetSeed(seed)
+	s.SetWorkingDirectory("pages")
+	s.Crawl()
 	return
 }
