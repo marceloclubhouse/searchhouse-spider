@@ -2,6 +2,7 @@ package spider
 
 import (
 	"clubhouse/indexer"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
@@ -40,7 +41,7 @@ func (s *ClubhouseSpider) Crawl() {
 					}
 				}
 			}
-			time.Sleep(time.Second)
+			time.Sleep(time.Second * 5)
 		}
 	}
 }
@@ -66,14 +67,24 @@ func (s *ClubhouseSpider) writeToDisk(w WebPage) {
 	}
 }
 
+func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
+	// https://stackoverflow.com/questions/12518876/how-to-check-if-a-file-exists-in-go
+	if _, err := os.Stat(path); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
 func (s ClubhouseSpider) pageDownloaded(url string) bool {
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(url), 10) + ".json"
-	filePath, err := filepath.Abs(fileName)
+	exists, err := s.fileExists(fileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, err = os.Stat(filePath)
-	if err == nil {
+	if exists {
 		return true
 	} else {
 		return false
@@ -99,7 +110,6 @@ func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) String
 
 	// Remove all fragments (#), duplicate URLs, and
 	// return unordered list of URLs as StringSet
-
 	var properURLs StringSet
 	if root[len(root)-1] == '/' {
 		root = root[:len(root)-1]
