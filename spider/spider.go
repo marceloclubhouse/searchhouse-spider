@@ -16,27 +16,41 @@ import (
 )
 
 type ClubhouseSpider struct {
-	frontier         StringQueue
+	numThreads       int
+	frontier         Frontier
+	pages            indexer.Pages
 	tokenizer        indexer.Tokenizer
 	workingDirectory string
 }
 
+func New(numThreads int, workingDirectory string, seed []string) ClubhouseSpider {
+	cs := ClubhouseSpider{numThreads, Frontier{}, indexer.Pages{}, indexer.Tokenizer{}, workingDirectory}
+	cs.frontier.Init()
+	cs.pages.Init()
+	cs.setSeed(seed)
+	return cs
+}
+
 func (s *ClubhouseSpider) Crawl() {
-	for s.frontier.Len() > 0 {
-		current_url := s.frontier.Pop()
-		if !s.pageDownloaded(current_url) {
-			resp, err := http.Get(current_url)
+	for true {
+		currentUrl := s.frontier.PopURL()
+		if currentUrl == "" {
+			return
+		}
+		if !s.pageDownloaded(currentUrl) {
+			resp, err := http.Get(currentUrl)
 			if resp.Status == "200 OK" && err == nil {
 				body, err := ioutil.ReadAll(resp.Body)
+				s.pages.InsertPage(currentUrl)
 				if err == nil {
-					fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, current_url)
-					page := WebPage{time.Now().Unix(), current_url, resp.Status, string(body)}
+					fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
+					page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
 					s.writeToDisk(page)
 					// Continue constructing frontier
-					anchors := s.constructProperURLs(s.tokenizer.FindAllAnchors(string(body)), current_url)
+					anchors := s.constructProperURLs(s.tokenizer.FindAllAnchors(string(body)), currentUrl)
 					for key := range anchors.m {
-						if !s.pageDownloaded(key) {
-							s.frontier.Insert(key)
+						if !s.pages.CheckExists(key) && !s.frontier.CheckURLInFrontier(key) && !s.pageDownloaded(key) {
+							s.frontier.InsertPage(key)
 						}
 					}
 				}
@@ -139,14 +153,10 @@ func (s *ClubhouseSpider) hash(str string) uint64 {
 	return h.Sum64()
 }
 
-func (s *ClubhouseSpider) SetSeed(urls []string) {
+func (s *ClubhouseSpider) setSeed(urls []string) {
 	for _, url := range urls {
-		s.frontier.Insert(url)
+		s.frontier.InsertPage(url)
 	}
-}
-
-func (s *ClubhouseSpider) SetWorkingDirectory(dir string) {
-	s.workingDirectory = dir
 }
 
 func (s ClubhouseSpider) PrintFrontier() {

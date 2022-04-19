@@ -5,10 +5,10 @@ import (
 )
 
 func main() {
-	seed := []string{"https://marcelocubillos.com"}
-	s := spider.ClubhouseSpider{}
-	s.SetSeed(seed)
-	s.SetWorkingDirectory("pages")
+	numThreads := 5
+	pageDir := "pages"
+	seed := []string{"https://marcelocubillos.com/"}
+	s := spider.New(numThreads, pageDir, seed)
 	s.Crawl()
 	return
 }
