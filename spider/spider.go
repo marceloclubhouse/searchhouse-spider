@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,8 +33,6 @@ func New(numThreads int, workingDirectory string, seed []string) ClubhouseSpider
 }
 
 func (s *ClubhouseSpider) Crawl() {
-	max_delay := 500000000
-	min_delay := 0
 	for true {
 		currentUrl := s.frontier.PopURL()
 		if currentUrl == "" {
@@ -43,24 +40,25 @@ func (s *ClubhouseSpider) Crawl() {
 		}
 		if !s.pageDownloaded(currentUrl) {
 			resp, err := http.Get(currentUrl)
-			fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
-			if resp.Status == "200 OK" && err == nil {
-				body, err := ioutil.ReadAll(resp.Body)
-				s.pages.InsertPage(currentUrl)
-				if err == nil {
-					page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
-					s.writeToDisk(page)
-					// Continue constructing frontier
-					anchors := s.constructProperURLs(s.tokenizer.FindAllAnchors(string(body)), currentUrl)
-					for key := range anchors.m {
-						if !s.pages.CheckExists(key) && !s.frontier.CheckURLInFrontier(key) && !s.pageDownloaded(key) {
-							s.frontier.InsertPage(key)
+			if err == nil {
+				fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
+				if resp.Status == "200 OK" {
+					body, err := ioutil.ReadAll(resp.Body)
+					s.pages.InsertPage(currentUrl)
+					if err == nil {
+						page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
+						s.writeToDisk(page)
+						// Continue constructing frontier
+						anchors := s.constructProperURLs(s.tokenizer.FindAllAnchors(string(body)), currentUrl)
+						for key := range anchors.m {
+							if !s.pageDownloaded(key) && !s.frontier.CheckURLInFrontier(key) {
+								s.frontier.InsertPage(key)
+							}
 						}
 					}
 				}
 			}
-			// Add random delay so sites don't get sussed out
-			time.Sleep(time.Duration(int(time.Second)*5 + rand.Intn(max_delay-min_delay+1) + min_delay))
+			time.Sleep(time.Second)
 		}
 	}
 }
