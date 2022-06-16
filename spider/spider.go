@@ -19,15 +19,13 @@ import (
 type ClubhouseSpider struct {
 	numThreads       int
 	frontier         Frontier
-	pages            indexer.Pages
 	tokenizer        indexer.Tokenizer
 	workingDirectory string
 }
 
 func New(numThreads int, workingDirectory string, seed []string) ClubhouseSpider {
-	cs := ClubhouseSpider{numThreads, Frontier{}, indexer.Pages{}, indexer.Tokenizer{}, workingDirectory}
+	cs := ClubhouseSpider{numThreads, Frontier{}, indexer.Tokenizer{}, workingDirectory}
 	cs.frontier.Init()
-	cs.pages.Init()
 	cs.setSeed(seed)
 	return cs
 }
@@ -44,7 +42,6 @@ func (s *ClubhouseSpider) Crawl() {
 				fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
 				if resp.Status == "200 OK" {
 					body, err := ioutil.ReadAll(resp.Body)
-					s.pages.InsertPage(currentUrl)
 					if err == nil {
 						page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
 						s.writeToDisk(page)
@@ -113,17 +110,26 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	// URL must not have fragment (#) and not end
 	// with a non-HTML file extension
 	urlRe := regexp.MustCompile(`^(?P<scheme>https?://)` +
-		`(?P<hostname>[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b)` +
+		`(?P<hostname>[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})` +
 		`(?P<resource>[-a-zA-Z0-9()@:_+~?=/]*)$`)
 	extRe := regexp.MustCompile(`.*\.(?:css|js|bmp|gif|jpe?g|ico|png|tiff?|mid|mp2|mp3|mp4|ppsx|` +
 		`wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf|odc|sas|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|` +
 		`names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1|ss|scm|py|rkt|r|c|` +
 		`thmx|mso|arff|rtf|jar|csv|java|txt|rm|smil|wmv|swf|wma|zip|rar|gz)$`)
-	if urlRe.MatchString(url) && !extRe.MatchString(strings.ToLower(url)) {
+	if urlRe.MatchString(url) && !extRe.MatchString(strings.ToLower(url)) && strings.HasSuffix(s.regexToMap(urlRe, url)["hostname"], "uci.edu") {
 		return true
 	} else {
 		return false
 	}
+}
+
+func (s *ClubhouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]string {
+	match := r.FindStringSubmatch(str)
+	results := map[string]string{}
+	for i, name := range match {
+		results[r.SubexpNames()[i]] = name
+	}
+	return results
 }
 
 func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) StringSet {
@@ -167,7 +173,9 @@ func (s *ClubhouseSpider) hash(str string) uint64 {
 
 func (s *ClubhouseSpider) setSeed(urls []string) {
 	for _, url := range urls {
-		s.frontier.InsertPage(url)
+		if !s.pageDownloaded(url) {
+			s.frontier.InsertPage(url)
+		}
 	}
 }
 
