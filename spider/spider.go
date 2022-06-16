@@ -112,8 +112,9 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	// Return True if a URL is valid, False otherwise
 	// URL must not have fragment (#) and not end
 	// with a non-HTML file extension
-	urlRe := regexp.MustCompile(`^https://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]` +
-		`{1,6}\b([-a-zA-Z0-9()@:_+~/]*)$`)
+	urlRe := regexp.MustCompile(`^(?P<scheme>https?://)` +
+		`(?P<hostname>[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b)` +
+		`(?P<resource>[-a-zA-Z0-9()@:_+~?=/]*)$`)
 	extRe := regexp.MustCompile(`.*\.(?:css|js|bmp|gif|jpe?g|ico|png|tiff?|mid|mp2|mp3|mp4|ppsx|` +
 		`wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf|odc|sas|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|` +
 		`names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1|ss|scm|py|rkt|r|c|` +
