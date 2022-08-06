@@ -7,11 +7,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
+	"sync"
 )
 
 type Frontier struct {
 	db          *sql.DB
 	initialized bool
+	mutex       sync.Mutex
 }
 
 func (f *Frontier) Init() {
@@ -67,20 +69,27 @@ func (f *Frontier) PopURL() string {
 	}
 	var url string
 	query := `SELECT url FROM frontier LIMIT 1`
+
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	result := f.db.QueryRow(query)
 	err := result.Scan(&url)
 	if err != nil {
 		return ""
 	}
+
 	query = fmt.Sprintf(`DELETE FROM frontier WHERE url = '%s';`, url)
 	statement, err := f.db.Prepare(query)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	_, err = statement.Exec()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return url
 }
 
@@ -90,6 +99,8 @@ func (f *Frontier) CheckURLInFrontier(url string) bool {
 	}
 	var exists bool
 	query := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM frontier WHERE url = '%s');`, url)
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	result := f.db.QueryRow(query)
 	err := result.Scan(&exists)
 	if err != nil {
@@ -103,13 +114,16 @@ func (f *Frontier) InsertPage(url string) {
 		log.Fatal("Must initialize database connection before operating on it")
 	}
 	query := fmt.Sprintf(`INSERT INTO frontier (url) VALUES ('%s');`, url)
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	statement, err := f.db.Prepare(query)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Change to non-fatal log to prevent crashing
 	_, err = statement.Exec()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	return
 }

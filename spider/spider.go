@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,16 +31,27 @@ func New(numThreads int, workingDirectory string, seed []string) ClubhouseSpider
 	return cs
 }
 
-func (s *ClubhouseSpider) Crawl() {
+func (s *ClubhouseSpider) CrawlConcurrently() {
+	wg := new(sync.WaitGroup)
+	wg.Add(s.numThreads)
+	for i := 0; i < s.numThreads; i++ {
+		go s.Crawl(i, wg)
+	}
+	wg.Wait()
+}
+
+func (s *ClubhouseSpider) Crawl(threadNum int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for true {
 		currentUrl := s.frontier.PopURL()
 		if currentUrl == "" {
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 		if !s.pageDownloaded(currentUrl) {
 			resp, err := http.Get(currentUrl)
 			if err == nil {
-				fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
+				fmt.Printf("<ClubhouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", threadNum, resp.Status, currentUrl)
 				if resp.Status == "200 OK" {
 					body, err := ioutil.ReadAll(resp.Body)
 					if err == nil {
@@ -141,6 +153,7 @@ func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) String
 	// return unordered list of URLs as StringSet
 	var properURLs StringSet
 	domainRe := regexp.MustCompile(`https?://[^\s:/]+\.[^\s:/]+`)
+
 	root = domainRe.FindAllStringSubmatch(root, -1)[0][0]
 
 	for _, url := range urls {

@@ -5,10 +5,10 @@ import (
 )
 
 func main() {
-	numThreads := 5
+	numThreads := 100
 	pageDir := "pages"
 	seed := []string{"https://uci.edu/"}
 	s := spider.New(numThreads, pageDir, seed)
-	s.Crawl()
+	s.CrawlConcurrently()
 	return
 }
