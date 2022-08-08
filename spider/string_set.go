@@ -22,7 +22,7 @@ func (s *StringSet) Contains(str string) bool {
 }
 
 func (s *StringSet) Merge(right StringSet) {
-	for key,_ := range right.m {
+	for key, _ := range right.m {
 		s.Add(key)
 	}
 }
