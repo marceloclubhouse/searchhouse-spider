@@ -130,7 +130,7 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 		`wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf|odc|sas|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|` +
 		`names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1|ss|scm|py|rkt|r|c|` +
 		`thmx|mso|arff|rtf|jar|csv|java|txt|rm|smil|wmv|swf|wma|zip|rar|gz)$`)
-	if urlRe.MatchString(url) && !extRe.MatchString(strings.ToLower(url)) && strings.HasSuffix(s.regexToMap(urlRe, url)["hostname"], "uci.edu") {
+	if urlRe.MatchString(url) && !extRe.MatchString(strings.ToLower(url)) {
 		return true
 	} else {
 		return false

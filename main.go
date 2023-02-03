@@ -5,10 +5,10 @@ import (
 )
 
 func main() {
-	numRoutines := 100
+	numRoutines := 1000
 	maxLinks := 100
-	pageDir := "pages"
-	seed := []string{"https://uci.edu/"}
+	pageDir := "/Users/marcelo/clubhouse-pages"
+	seed := []string{"https://marcelocubillos.com"}
 	s := spider.New(numRoutines, pageDir, seed, maxLinks)
 	s.CrawlConcurrently()
 	return
