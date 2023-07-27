@@ -23,8 +23,8 @@ type ClubhouseSpider struct {
 	maxLinksPerPage  int
 }
 
-func New(numThreads int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
-	cs := ClubhouseSpider{numThreads, Frontier{}, workingDirectory, maxLinks}
+func New(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
+	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks}
 	cs.frontier.Init()
 	cs.setSeed(seed)
 	return cs

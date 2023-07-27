@@ -1,15 +1,20 @@
 package main
 
 import (
-	"clubhouse/spider"
+	"clubhouse-spider/spider"
+	"flag"
 )
 
 func main() {
-	numRoutines := 1000
-	maxLinks := 100
-	pageDir := "/Users/marcelo/clubhouse-pages"
-	seed := []string{"https://marcelocubillos.com"}
-	s := spider.New(numRoutines, pageDir, seed, maxLinks)
+	// Frontier (pages.db) must be reset if numRoutines changes in between runs!
+	numRoutines := flag.Int("numRoutines", 1, "Number of routines for spider to use")
+	pageDir := flag.String("pageDir", "pages", "Location for pages to be saved")
+	seed := flag.String("seed", "", "First page to start out crawling with")
+	maxLinks := flag.Int("maxLinks", 20, "Maximum number of links acceptable within a web page (memory usage)")
+
+	flag.Parse()
+
+	s := spider.New(*numRoutines, *pageDir, []string{*seed}, *maxLinks)
 	s.CrawlConcurrently()
 	return
 }

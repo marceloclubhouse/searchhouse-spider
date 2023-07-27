@@ -1,4 +1,4 @@
-module clubhouse
+module clubhouse-spider
 
 go 1.17
 
