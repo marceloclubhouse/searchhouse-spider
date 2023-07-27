@@ -1,7 +1,7 @@
 package spider
 
 import (
-	"clubhouse/indexer"
+	"clubhouse-spider/indexer"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -24,11 +24,13 @@ type ClubhouseSpider struct {
 	workingDirectory string
 }
 
-func New(numThreads int, workingDirectory string, seed []string) ClubhouseSpider {
-	cs := ClubhouseSpider{numThreads, Frontier{}, indexer.Pages{}, indexer.Tokenizer{}, workingDirectory}
+func New(numRoutines int, workingDirectory string, seed []string) ClubhouseSpider {
+	cs := ClubhouseSpider{numRoutines, Frontier{}, indexer.Pages{}, indexer.Tokenizer{}, workingDirectory}
 	cs.frontier.Init()
 	cs.pages.Init()
-	cs.setSeed(seed)
+	if len(seed) > 0 && seed[0] != "" {
+		cs.setSeed(seed)
+	}
 	return cs
 }
 
@@ -166,7 +168,9 @@ func (s *ClubhouseSpider) hash(str string) uint64 {
 
 func (s *ClubhouseSpider) setSeed(urls []string) {
 	for _, url := range urls {
-		s.frontier.InsertPage(url)
+		if !s.pageDownloaded(url) {
+			s.frontier.InsertPage(url)
+		}
 	}
 }
 
