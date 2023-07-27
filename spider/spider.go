@@ -1,7 +1,6 @@
 package spider
 
 import (
-	"clubhouse-spider/indexer"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -13,48 +12,55 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type ClubhouseSpider struct {
-	numThreads       int
+	numRoutines      int
 	frontier         Frontier
-	pages            indexer.Pages
-	tokenizer        indexer.Tokenizer
 	workingDirectory string
+	maxLinksPerPage  int
 }
 
-func New(numRoutines int, workingDirectory string, seed []string) ClubhouseSpider {
-	cs := ClubhouseSpider{numRoutines, Frontier{}, indexer.Pages{}, indexer.Tokenizer{}, workingDirectory}
+func New(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
+	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks}
 	cs.frontier.Init()
-	cs.pages.Init()
-	if len(seed) > 0 && seed[0] != "" {
-		cs.setSeed(seed)
-	}
+	cs.setSeed(seed)
 	return cs
 }
 
-func (s *ClubhouseSpider) Crawl() {
+func (s *ClubhouseSpider) CrawlConcurrently() {
+	wg := new(sync.WaitGroup)
+	wg.Add(s.numRoutines)
+	for i := 0; i < s.numRoutines; i++ {
+		go s.Crawl(i, wg)
+	}
+	wg.Wait()
+}
+
+func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for true {
-		currentUrl := s.frontier.PopURL()
+		currentUrl := s.frontier.PopURL(routineNum)
 		if currentUrl == "" {
-			return
+			time.Sleep(time.Second)
+			continue
 		}
 		if !s.pageDownloaded(currentUrl) {
 			resp, err := http.Get(currentUrl)
 			if err == nil {
-				fmt.Printf("<ClubhouseSpider.Crawl() - Response: %s, URL: %s>\n", resp.Status, currentUrl)
+				fmt.Printf("<ClubhouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", routineNum, resp.Status, currentUrl)
 				if resp.Status == "200 OK" {
 					body, err := ioutil.ReadAll(resp.Body)
-					s.pages.InsertPage(currentUrl)
 					if err == nil {
 						page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
 						s.writeToDisk(page)
 						// Continue constructing frontier
-						anchors := s.constructProperURLs(s.tokenizer.FindAllAnchors(string(body)), currentUrl)
+						anchors := s.constructProperURLs(page.FindAllAnchorHREFs(s.maxLinksPerPage), currentUrl)
 						for key := range anchors.m {
-							if !s.pageDownloaded(key) && !s.frontier.CheckURLInFrontier(key) {
-								s.frontier.InsertPage(key)
+							if !s.pageDownloaded(key) {
+								s.frontier.InsertPage(key, s.calcWebsiteToRoutineNum(key))
 							}
 						}
 					}
@@ -98,6 +104,9 @@ func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
 }
 
 func (s ClubhouseSpider) pageDownloaded(url string) bool {
+	// Check if a page is downloaded by generating
+	// the corresponding filename and "pinging"
+	// the filesystem
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(url), 10) + ".json"
 	exists, err := s.fileExists(fileName)
 	if err != nil {
@@ -114,8 +123,9 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	// Return True if a URL is valid, False otherwise
 	// URL must not have fragment (#) and not end
 	// with a non-HTML file extension
-	urlRe := regexp.MustCompile(`^https://(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]` +
-		`{1,6}\b([-a-zA-Z0-9()@:_+~/]*)$`)
+	urlRe := regexp.MustCompile(`^(?P<scheme>https?://)` +
+		`(?P<hostname>[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})` +
+		`(?P<resource>[-a-zA-Z0-9()@:_+~?=/]*)$`)
 	extRe := regexp.MustCompile(`.*\.(?:css|js|bmp|gif|jpe?g|ico|png|tiff?|mid|mp2|mp3|mp4|ppsx|` +
 		`wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf|odc|sas|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|` +
 		`names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1|ss|scm|py|rkt|r|c|` +
@@ -127,6 +137,27 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	}
 }
 
+func (s *ClubhouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]string {
+	// Convert regex capturing groups and their
+	// corresponding matches to a hashmap
+	match := r.FindStringSubmatch(str)
+	results := map[string]string{}
+	for i, name := range match {
+		results[r.SubexpNames()[i]] = name
+	}
+	return results
+}
+
+func (s *ClubhouseSpider) findHostName(url string) string {
+	// Return the host name from a URL
+	domainRe := regexp.MustCompile(`https?://[^\s:/@]+\.[^\s:/@]+`)
+	substr := domainRe.FindAllStringSubmatch(url, -1)
+	if len(substr) == 0 || len(substr[0]) == 0 {
+		return ""
+	}
+	return substr[0][0]
+}
+
 func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) StringSet {
 	// Given a list of anchor HREF strings and a
 	// root URL, return a list of proper URLS
@@ -135,13 +166,18 @@ func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) String
 	// Remove all fragments (#), duplicate URLs, and
 	// return unordered list of URLs as StringSet
 	var properURLs StringSet
-	domainRe := regexp.MustCompile(`https?://[^\s:/]+\.[^\s:/]+`)
-	root = domainRe.FindAllStringSubmatch(root, -1)[0][0]
+
+	hostName := s.findHostName(root)
+	// If the root isn't a proper URL, return an empty
+	// list (can happen if link is mailto:)
+	if hostName == "" {
+		return properURLs
+	}
 
 	for _, url := range urls {
 		var parsedURL string
 		if url[0] == '/' {
-			parsedURL = root + url
+			parsedURL = hostName + url
 		} else {
 			if url[len(url)-1] == '/' {
 				parsedURL = url[:len(url)-1]
@@ -158,6 +194,7 @@ func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) String
 }
 
 func (s *ClubhouseSpider) hash(str string) uint64 {
+	// Given a string, return an unsigned int hash
 	h := fnv.New64a()
 	_, err := h.Write([]byte(str))
 	if err != nil {
@@ -166,14 +203,26 @@ func (s *ClubhouseSpider) hash(str string) uint64 {
 	return h.Sum64()
 }
 
-func (s *ClubhouseSpider) setSeed(urls []string) {
-	for _, url := range urls {
-		if !s.pageDownloaded(url) {
-			s.frontier.InsertPage(url)
-		}
+func (s *ClubhouseSpider) calcWebsiteToRoutineNum(url string) int {
+	hostname := s.findHostName(url)
+	hash := s.abs(int(s.hash(hostname)))
+	return hash % s.numRoutines
+}
+
+func (s *ClubhouseSpider) abs(val int) int {
+	if val < 0 {
+		return -1 * val
+	} else {
+		return val
 	}
 }
 
-func (s ClubhouseSpider) PrintFrontier() {
-	fmt.Println(s.frontier)
+func (s *ClubhouseSpider) setSeed(urls []string) {
+	// Set the spider's seed by inserting URLs
+	// into the frontier
+	for _, url := range urls {
+		if !s.pageDownloaded(url) {
+			s.frontier.InsertPage(url, 0)
+		}
+	}
 }

@@ -1,5 +1,4 @@
 # Clubhouse Spider
-## Open-source web crawler
 Web crawlers are dime-a-dozen. I built this spider specifically to retrieve web pages
 at a high volume as the beginning of my search engine pipeline.
 
