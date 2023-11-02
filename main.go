@@ -14,7 +14,7 @@ func main() {
 
 	flag.Parse()
 
-	s := spider.New(*numRoutines, *pageDir, []string{*seed}, *maxLinks)
+	s := spider.NewSpider(*numRoutines, *pageDir, []string{*seed}, *maxLinks)
 	s.CrawlConcurrently()
 	return
 }

@@ -10,41 +10,54 @@ import (
 )
 
 type WebPage struct {
-	Time     int64
-	URL      string
-	Response string
-	Body     string
+	time         int64
+	url          string
+	response     string
+	body         string
+	fingerprints *Fingerprints
 }
 
-func (w *WebPage) Serialize() []byte {
+func NewWebPage(time int64, url string, response string, body string) *WebPage {
+	wp := &WebPage{
+		time:         time,
+		url:          url,
+		response:     response,
+		body:         body,
+		fingerprints: NewFingerprints(3, 1000),
+	}
+	wp.fingerprints.InsertFingerprintsUsingWebpage(wp)
+	return wp
+}
+
+func (wp *WebPage) Serialize() []byte {
 	// Serialize WebPage object as JSON byte array
-	b, err := json.Marshal(w)
+	b, err := json.Marshal(wp)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	return b
 }
 
-func (w *WebPage) FindAllAnchorHREFs(maxNumHREF int) []string {
-	// Find all of the links within HTML markup
+func (wp *WebPage) FindAllAnchorHREFs(maxNumHREF int) []string {
+	// Find all links within HTML markup
 	// (<a href="...">) -> ["..."]
 	var hrefs []string
 	re := regexp.MustCompile(`href=['"]?([^'" >]+)`)
-	matches := re.FindAllStringSubmatch(w.Body, maxNumHREF)
+	matches := re.FindAllStringSubmatch(wp.body, maxNumHREF)
 	for _, element := range matches {
 		hrefs = append(hrefs, element[1])
 	}
 	return hrefs
 }
 
-func (w *WebPage) findAllTags(tags []string) []string {
+func (wp *WebPage) findAllTags(tags []string) []string {
 	// Extract the specified tags out of HTML
 	// markup and return the content of each
 	// tag as a list of strings
 	var content []string
 	for _, tag := range tags {
 		re := regexp.MustCompile(fmt.Sprintf(`<%s.*?>(.*)</%s>`, tag, tag))
-		matches := re.FindAllStringSubmatch(w.Body, -1)
+		matches := re.FindAllStringSubmatch(wp.body, -1)
 		for _, element := range matches {
 			content = append(content, element[1])
 		}
@@ -52,7 +65,7 @@ func (w *WebPage) findAllTags(tags []string) []string {
 	return content
 }
 
-func (w *WebPage) removeAllMarkup(str string) string {
+func (wp *WebPage) removeAllMarkup(str string) string {
 	// Given some text, remove all HTML brackets
 	// from it (e.g. "this <span>is</span> text"
 	// becomes "this is text")
@@ -65,7 +78,7 @@ func (w *WebPage) removeAllMarkup(str string) string {
 	}
 }
 
-func (w *WebPage) removeAllPunctuation(str string) string {
+func (wp *WebPage) removeAllPunctuation(str string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9-:\s'’/–-]`)
 	if re.MatchString(str) {
 		return re.ReplaceAllString(str, " ")
@@ -74,16 +87,25 @@ func (w *WebPage) removeAllPunctuation(str string) string {
 	}
 }
 
-func (w *WebPage) extractText() string {
+func (wp *WebPage) extractText() string {
 	// Extract all the text from this WebPage object
 	var str string
-	tags := w.findAllTags([]string{"p"})
+	tags := wp.findAllTags([]string{"p"})
 	for _, content := range tags {
-		str = str + strings.ToLower(w.removeAllPunctuation(w.removeAllMarkup(content)))
+		str = str + strings.ToLower(wp.removeAllPunctuation(wp.removeAllMarkup(content)))
 	}
 	return str
 }
 
-func (w *WebPage) generateNGrams(n int) string {
-	return w.extractText()
+func (wp *WebPage) Similarity(webPage *WebPage) float64 {
+	intersection := 0
+	left := wp.fingerprints.GetFingerprintsAsSet()
+	right := webPage.fingerprints.GetFingerprintsAsSet()
+	for hash := range left {
+		if _, exists := right[hash]; exists {
+			intersection++
+		}
+	}
+	union := len(left) + len(right) - intersection
+	return float64(intersection) / float64(union)
 }
