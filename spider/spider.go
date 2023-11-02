@@ -23,7 +23,6 @@ type ClubhouseSpider struct {
 	maxLinksPerPage  int
 }
 
-
 func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
 	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks}
 	cs.frontier.Init()
@@ -80,7 +79,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 
 func (s *ClubhouseSpider) writeToDisk(w WebPage) {
 	// Serialize web page to JSON format
-	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.url), 10) + ".json"
+	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.Url), 10) + ".json"
 	filePath, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
@@ -245,8 +244,8 @@ func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
 		if _, exists := fpGlobalSet[hash]; exists {
 			for page := range fpGlobalSet[hash] {
 				similarity := wp.Similarity(page)
-				if page.url != wp.url && similarity > 0.9 {
-					fmt.Printf("%s has a %f match to %s\n", page.url, similarity, wp.url)
+				if page.Url != wp.Url && similarity > 0.9 {
+					fmt.Printf("%s has a %f match to %s\n", page.Url, similarity, wp.Url)
 					return true
 				}
 			}

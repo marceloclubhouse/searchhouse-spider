@@ -41,7 +41,7 @@ func (fp *Fingerprints) nGramsToHashes(nGrams []string) []uint32 {
 }
 
 func (fp *Fingerprints) InsertFingerprintsUsingWebpage(wp *WebPage) {
-	nGrams := fp.nGram(wp.body)
+	nGrams := fp.nGram(wp.Body)
 	hashes := fp.nGramsToHashes(nGrams)
 	fp.mu.Lock()
 	for _, h := range hashes {

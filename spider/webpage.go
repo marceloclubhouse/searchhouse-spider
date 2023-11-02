@@ -10,20 +10,19 @@ import (
 )
 
 type WebPage struct {
-	time         int64
-	url          string
-	response     string
-	body         string
+	Time         int64  `json:"time"`
+	Url          string `json:"url"`
+	Response     string `json:"response"`
+	Body         string `json:"body"`
 	fingerprints *Fingerprints
 }
 
-
 func NewWebPage(time int64, url string, response string, body string) *WebPage {
 	wp := &WebPage{
-		time:         time,
-		url:          url,
-		response:     response,
-		body:         body,
+		Time:         time,
+		Url:          url,
+		Response:     response,
+		Body:         body,
 		fingerprints: NewFingerprints(3, 1000),
 	}
 	wp.fingerprints.InsertFingerprintsUsingWebpage(wp)
@@ -44,13 +43,12 @@ func (wp *WebPage) FindAllAnchorHREFs(maxNumHREF int) []string {
 	// (<a href="...">) -> ["..."]
 	var hrefs []string
 	re := regexp.MustCompile(`href=['"]?([^'" >]+)`)
-	matches := re.FindAllStringSubmatch(wp.body, maxNumHREF)
+	matches := re.FindAllStringSubmatch(wp.Body, maxNumHREF)
 	for _, element := range matches {
 		hrefs = append(hrefs, element[1])
 	}
 	return hrefs
 }
-
 
 func (wp *WebPage) findAllTags(tags []string) []string {
 	// Extract the specified tags out of HTML
@@ -59,7 +57,7 @@ func (wp *WebPage) findAllTags(tags []string) []string {
 	var content []string
 	for _, tag := range tags {
 		re := regexp.MustCompile(fmt.Sprintf(`<%s.*?>(.*)</%s>`, tag, tag))
-		matches := re.FindAllStringSubmatch(wp.body, -1)
+		matches := re.FindAllStringSubmatch(wp.Body, -1)
 		for _, element := range matches {
 			content = append(content, element[1])
 		}
@@ -80,7 +78,6 @@ func (wp *WebPage) removeAllMarkup(str string) string {
 	}
 }
 
-
 func (wp *WebPage) removeAllPunctuation(str string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9-:\s'’/–-]`)
 	if re.MatchString(str) {
@@ -89,7 +86,6 @@ func (wp *WebPage) removeAllPunctuation(str string) string {
 		return str
 	}
 }
-
 
 func (wp *WebPage) extractText() string {
 	// Extract all the text from this WebPage object
