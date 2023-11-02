@@ -41,7 +41,7 @@ func (s *ClubhouseSpider) CrawlConcurrently() {
 
 func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fp := NewFingerprints(3, 1000000)
+	fp := NewFingerprints(3, 10000)
 	for true {
 		currentUrl := s.frontier.PopURL(routineNum)
 		if currentUrl == "" || !s.urlValid(currentUrl) {
