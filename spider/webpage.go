@@ -17,6 +17,7 @@ type WebPage struct {
 	fingerprints *Fingerprints
 }
 
+
 func NewWebPage(time int64, url string, response string, body string) *WebPage {
 	wp := &WebPage{
 		time:         time,
@@ -50,6 +51,7 @@ func (wp *WebPage) FindAllAnchorHREFs(maxNumHREF int) []string {
 	return hrefs
 }
 
+
 func (wp *WebPage) findAllTags(tags []string) []string {
 	// Extract the specified tags out of HTML
 	// markup and return the content of each
@@ -78,6 +80,7 @@ func (wp *WebPage) removeAllMarkup(str string) string {
 	}
 }
 
+
 func (wp *WebPage) removeAllPunctuation(str string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9-:\s'’/–-]`)
 	if re.MatchString(str) {
@@ -86,6 +89,7 @@ func (wp *WebPage) removeAllPunctuation(str string) string {
 		return str
 	}
 }
+
 
 func (wp *WebPage) extractText() string {
 	// Extract all the text from this WebPage object
