@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,7 +23,8 @@ type ClubhouseSpider struct {
 	maxLinksPerPage  int
 }
 
-func New(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
+
+func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
 	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks}
 	cs.frontier.Init()
 	cs.setSeed(seed)
@@ -41,9 +42,10 @@ func (s *ClubhouseSpider) CrawlConcurrently() {
 
 func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 	defer wg.Done()
+	fp := NewFingerprints(3, 1000000)
 	for true {
 		currentUrl := s.frontier.PopURL(routineNum)
-		if currentUrl == "" {
+		if currentUrl == "" || !s.urlValid(currentUrl) {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -52,10 +54,15 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 			if err == nil {
 				fmt.Printf("<ClubhouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", routineNum, resp.Status, currentUrl)
 				if resp.Status == "200 OK" {
-					body, err := ioutil.ReadAll(resp.Body)
+					body, err := io.ReadAll(resp.Body)
 					if err == nil {
-						page := WebPage{time.Now().Unix(), currentUrl, resp.Status, string(body)}
-						s.writeToDisk(page)
+						page := NewWebPage(time.Now().Unix(), currentUrl, resp.Status, string(body))
+						if s.duplicateExists(fp, page) {
+							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since it has a near match\n", routineNum, currentUrl)
+							continue
+						}
+						fp.InsertFingerprintsUsingWebpage(page)
+						s.writeToDisk(*page)
 						// Continue constructing frontier
 						anchors := s.constructProperURLs(page.FindAllAnchorHREFs(s.maxLinksPerPage), currentUrl)
 						for key := range anchors.m {
@@ -73,7 +80,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 
 func (s *ClubhouseSpider) writeToDisk(w WebPage) {
 	// Serialize web page to JSON format
-	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.URL), 10) + ".json"
+	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.url), 10) + ".json"
 	filePath, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
@@ -103,7 +110,7 @@ func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
 	}
 }
 
-func (s ClubhouseSpider) pageDownloaded(url string) bool {
+func (s *ClubhouseSpider) pageDownloaded(url string) bool {
 	// Check if a page is downloaded by generating
 	// the corresponding filename and "pinging"
 	// the filesystem
@@ -225,4 +232,25 @@ func (s *ClubhouseSpider) setSeed(urls []string) {
 			s.frontier.InsertPage(url, 0)
 		}
 	}
+}
+
+func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
+	fpGlobalSet := fp.GetFingerprintsAsSet()
+	fpWebpageSet := wp.fingerprints.GetFingerprintsAsSet()
+	fp.mu.Lock()
+	wp.fingerprints.mu.Lock()
+	defer wp.fingerprints.mu.Unlock()
+	defer fp.mu.Unlock()
+	for hash := range fpWebpageSet {
+		if _, exists := fpGlobalSet[hash]; exists {
+			for page := range fpGlobalSet[hash] {
+				similarity := wp.Similarity(page)
+				if page.url != wp.url && similarity > 0.9 {
+					fmt.Printf("%s has a %f match to %s\n", page.url, similarity, wp.url)
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
