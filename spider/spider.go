@@ -56,6 +56,10 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 					body, err := io.ReadAll(resp.Body)
 					if err == nil {
 						page := NewWebPage(time.Now().Unix(), currentUrl, resp.Status, string(body))
+						err = resp.Body.Close()
+						if err != nil {
+							panic(err)
+						}
 						// Check for issues with the page before cataloging
 						if !s.validPage(page) {
 							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since the HTML does not appear valid\n", routineNum, currentUrl)
@@ -73,6 +77,11 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 							if !s.pageDownloaded(key) {
 								s.frontier.InsertPage(key, s.calcWebsiteToRoutineNum(key))
 							}
+						}
+					} else {
+						err = resp.Body.Close()
+						if err != nil {
+							panic(err)
 						}
 					}
 				}
