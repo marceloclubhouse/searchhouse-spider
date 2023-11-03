@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 type ClubhouseSpider struct {
@@ -56,6 +57,11 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 					body, err := io.ReadAll(resp.Body)
 					if err == nil {
 						page := NewWebPage(time.Now().Unix(), currentUrl, resp.Status, string(body))
+						// Check for issues with the page before cataloging
+						if !s.validPage(page) {
+							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since the HTML does not appear valid\n", routineNum, currentUrl)
+							continue
+						}
 						if s.duplicateExists(fp, page) {
 							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since it has a near match\n", routineNum, currentUrl)
 							continue
@@ -252,6 +258,18 @@ func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
 				}
 			}
 		}
+	}
+	return false
+}
+
+func (s *ClubhouseSpider) validPage(wp *WebPage) bool {
+	// Could eventually be expanded into evaluating the page in its
+	// entirety to be valid HTML
+	trimmedBody := strings.TrimLeftFunc(wp.Body, unicode.IsSpace)
+	if strings.HasPrefix(trimmedBody, "<!DOCTYPE html") {
+		return true
+	} else if strings.HasPrefix(trimmedBody, "<!doctype html") {
+		return true
 	}
 	return false
 }
