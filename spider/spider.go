@@ -243,10 +243,12 @@ func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
 	for hash := range fpWebpageSet {
 		if _, exists := fpGlobalSet[hash]; exists {
 			for page := range fpGlobalSet[hash] {
-				similarity := wp.Similarity(page)
-				if page.Url != wp.Url && similarity > 0.9 {
-					fmt.Printf("%s has a %f match to %s\n", page.Url, similarity, wp.Url)
-					return true
+				if page.Url != wp.Url {
+					similarity := wp.Similarity(page)
+					if similarity > 0.9 {
+						fmt.Printf("%s has a %f match to %s\n", page.Url, similarity, wp.Url)
+						return true
+					}
 				}
 			}
 		}
