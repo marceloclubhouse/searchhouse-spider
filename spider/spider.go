@@ -47,6 +47,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu
 	for true {
 		currentUrl := s.frontier.PopURL(routineNum)
 		if currentUrl == "" || !s.urlValid(currentUrl) {
+			time.Sleep(time.Second)
 			continue
 		}
 		if !s.pageDownloaded(currentUrl) {
