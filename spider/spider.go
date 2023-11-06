@@ -22,26 +22,27 @@ type ClubhouseSpider struct {
 	frontier         Frontier
 	workingDirectory string
 	maxLinksPerPage  int
+	ioMu             *sync.Mutex
 }
 
-func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) ClubhouseSpider {
-	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks}
+func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) *ClubhouseSpider {
+	ioMu := new(sync.Mutex)
+	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks, ioMu}
 	cs.frontier.Init()
-	cs.setSeed(seed)
-	return cs
+	cs.setSeed(seed, ioMu)
+	return &cs
 }
 
 func (s *ClubhouseSpider) CrawlConcurrently() {
-	fileWriterMu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	wg.Add(s.numRoutines)
 	for i := 0; i < s.numRoutines; i++ {
-		go s.Crawl(i, wg, fileWriterMu)
+		go s.Crawl(i, wg, s.ioMu)
 	}
 	wg.Wait()
 }
 
-func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu *sync.Mutex) {
+func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.Mutex) {
 	defer wg.Done()
 	fp := NewFingerprints(3, 10000)
 	for true {
@@ -50,7 +51,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu
 			time.Sleep(time.Second)
 			continue
 		}
-		if !s.pageDownloaded(currentUrl) {
+		if !s.pageDownloaded(currentUrl, ioMu) {
 			resp, err := http.Get(currentUrl)
 			if err == nil {
 				fmt.Printf("<ClubhouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", routineNum, resp.Status, currentUrl)
@@ -72,11 +73,11 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu
 							continue
 						}
 						fp.InsertFingerprintsUsingWebpage(page)
-						s.writeToDisk(*page, fileWriterMu)
+						s.writeToDisk(*page, ioMu)
 						// Continue constructing frontier
 						anchors := s.constructProperURLs(page.FindAllAnchorHREFs(s.maxLinksPerPage), currentUrl)
 						for key := range anchors.m {
-							if !s.pageDownloaded(key) {
+							if !s.pageDownloaded(key, ioMu) {
 								s.frontier.InsertPage(key, s.calcWebsiteToRoutineNum(key))
 							}
 						}
@@ -93,15 +94,15 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu
 	}
 }
 
-func (s *ClubhouseSpider) writeToDisk(w WebPage, fileWriterMu *sync.Mutex) {
+func (s *ClubhouseSpider) writeToDisk(w WebPage, ioMu *sync.Mutex) {
 	// Serialize web page to JSON format
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.Url), 10) + ".json"
+	defer ioMu.Unlock()
+	ioMu.Lock()
 	filePath, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer fileWriterMu.Unlock()
-	fileWriterMu.Lock()
 	f, err := os.Create(filePath)
 	if err != nil {
 		log.Fatalln(err)
@@ -127,11 +128,13 @@ func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
 	}
 }
 
-func (s *ClubhouseSpider) pageDownloaded(url string) bool {
+func (s *ClubhouseSpider) pageDownloaded(url string, ioMu *sync.Mutex) bool {
 	// Check if a page is downloaded by generating
 	// the corresponding filename and "pinging"
 	// the filesystem
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(url), 10) + ".json"
+	defer ioMu.Unlock()
+	ioMu.Lock()
 	exists, err := s.fileExists(fileName)
 	if err != nil {
 		log.Fatalln(err)
@@ -241,11 +244,11 @@ func (s *ClubhouseSpider) abs(val int) int {
 	}
 }
 
-func (s *ClubhouseSpider) setSeed(urls []string) {
+func (s *ClubhouseSpider) setSeed(urls []string, ioMu *sync.Mutex) {
 	// Set the spider's seed by inserting URLs
 	// into the frontier
 	for _, url := range urls {
-		if !s.pageDownloaded(url) {
+		if !s.pageDownloaded(url, ioMu) {
 			s.frontier.InsertPage(url, 0)
 		}
 	}
