@@ -32,15 +32,16 @@ func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks
 }
 
 func (s *ClubhouseSpider) CrawlConcurrently() {
+	fileWriterMu := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	wg.Add(s.numRoutines)
 	for i := 0; i < s.numRoutines; i++ {
-		go s.Crawl(i, wg)
+		go s.Crawl(i, wg, fileWriterMu)
 	}
 	wg.Wait()
 }
 
-func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
+func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, fileWriterMu *sync.Mutex) {
 	defer wg.Done()
 	fp := NewFingerprints(3, 10000)
 	for true {
@@ -70,7 +71,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 							continue
 						}
 						fp.InsertFingerprintsUsingWebpage(page)
-						s.writeToDisk(*page)
+						s.writeToDisk(*page, fileWriterMu)
 						// Continue constructing frontier
 						anchors := s.constructProperURLs(page.FindAllAnchorHREFs(s.maxLinksPerPage), currentUrl)
 						for key := range anchors.m {
@@ -91,29 +92,26 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup) {
 	}
 }
 
-func (s *ClubhouseSpider) writeToDisk(w WebPage) {
+func (s *ClubhouseSpider) writeToDisk(w WebPage, fileWriterMu *sync.Mutex) {
 	// Serialize web page to JSON format
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.Url), 10) + ".json"
 	filePath, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer fileWriterMu.Unlock()
+	fileWriterMu.Lock()
 	f, err := os.Create(filePath)
 	if err != nil {
-		// TODO: Might not be the best solution
-		// log.Fatalln(err)
-		log.Printf(err.Error())
-		return
+		log.Fatalln(err)
 	}
 	_, err = f.Write(w.Serialize())
 	if err != nil {
-		log.Printf(err.Error())
-		return
+		log.Fatalln(err)
 	}
 	err = f.Close()
 	if err != nil {
-		log.Printf(err.Error())
-		return
+		log.Fatalln(err)
 	}
 }
 
