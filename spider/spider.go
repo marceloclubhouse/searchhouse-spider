@@ -100,11 +100,13 @@ func (s *ClubhouseSpider) writeToDisk(w WebPage) {
 	}
 	f, err := os.Create(filePath)
 	if err != nil {
-		log.Fatalln(err)
+		// TODO: Might not be the best solution
+		// log.Fatalln(err)
+		log.Printf(err.Error())
 	}
 	_, err = f.Write(w.Serialize())
 	if err != nil {
-		log.Fatalln(err)
+		log.Printf(err.Error())
 	}
 	err = f.Close()
 	if err != nil {
