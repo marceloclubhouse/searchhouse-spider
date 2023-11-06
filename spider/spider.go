@@ -103,14 +103,17 @@ func (s *ClubhouseSpider) writeToDisk(w WebPage) {
 		// TODO: Might not be the best solution
 		// log.Fatalln(err)
 		log.Printf(err.Error())
+		return
 	}
 	_, err = f.Write(w.Serialize())
 	if err != nil {
 		log.Printf(err.Error())
+		return
 	}
 	err = f.Close()
 	if err != nil {
-		log.Fatalln(err)
+		log.Printf(err.Error())
+		return
 	}
 }
 
