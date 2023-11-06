@@ -107,11 +107,13 @@ func (s *ClubhouseSpider) writeToDisk(w WebPage, ioMu *sync.Mutex) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(f)
 	_, err = f.Write(w.Serialize())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	err = f.Close()
 	if err != nil {
 		log.Fatalln(err)
 	}
