@@ -150,7 +150,7 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	// Return True if a URL is valid, False otherwise
 	// URL must not have fragment (#) and not end
 	// with a non-HTML file extension
-	urlRe := regexp.MustCompile(`^(?P<scheme>https?://)` +
+	urlRe := regexp.MustCompile(`^(?P<scheme>https://)` +
 		`(?P<hostname>[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})` +
 		`(?P<resource>[-a-zA-Z0-9()@:_+~?=/]*)$`)
 	extRe := regexp.MustCompile(`.*\.(?:css|js|bmp|gif|jpe?g|ico|png|tiff?|mid|mp2|mp3|mp4|ppsx|` +
@@ -177,7 +177,7 @@ func (s *ClubhouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]st
 
 func (s *ClubhouseSpider) findHostName(url string) string {
 	// Return the host name from a URL
-	domainRe := regexp.MustCompile(`https?://[^\s:/@]+\.[^\s:/@]+`)
+	domainRe := regexp.MustCompile(`https://[^\s:/@]+\.[^\s:/@]+`)
 	substr := domainRe.FindAllStringSubmatch(url, -1)
 	if len(substr) == 0 || len(substr[0]) == 0 {
 		return ""
