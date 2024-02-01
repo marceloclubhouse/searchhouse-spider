@@ -1,4 +1,4 @@
-module clubhouse-spider
+module searchhouse-spider
 
 go 1.17
 

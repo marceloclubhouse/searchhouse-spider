@@ -17,7 +17,7 @@ import (
 	"unicode"
 )
 
-type ClubhouseSpider struct {
+type SearchHouseSpider struct {
 	numRoutines      int
 	frontier         Frontier
 	workingDirectory string
@@ -25,15 +25,15 @@ type ClubhouseSpider struct {
 	ioMu             *sync.Mutex
 }
 
-func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) *ClubhouseSpider {
+func NewSpider(numRoutines int, workingDirectory string, seed []string, maxLinks int) *SearchHouseSpider {
 	ioMu := new(sync.Mutex)
-	cs := ClubhouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks, ioMu}
+	cs := SearchHouseSpider{numRoutines, Frontier{}, workingDirectory, maxLinks, ioMu}
 	cs.frontier.Init()
 	cs.setSeed(seed, ioMu)
 	return &cs
 }
 
-func (s *ClubhouseSpider) CrawlConcurrently() {
+func (s *SearchHouseSpider) CrawlConcurrently() {
 	wg := new(sync.WaitGroup)
 	wg.Add(s.numRoutines)
 	for i := 0; i < s.numRoutines; i++ {
@@ -42,7 +42,7 @@ func (s *ClubhouseSpider) CrawlConcurrently() {
 	wg.Wait()
 }
 
-func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.Mutex) {
+func (s *SearchHouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.Mutex) {
 	defer wg.Done()
 	fp := NewFingerprints(3, 10000)
 	for true {
@@ -54,7 +54,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.M
 		if !s.pageDownloaded(currentUrl, ioMu) {
 			resp, err := http.Get(currentUrl)
 			if err == nil {
-				fmt.Printf("<ClubhouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", routineNum, resp.Status, currentUrl)
+				fmt.Printf("<SearchHouseSpider.Crawl(%d) - Response: %s, URL: %s>\n", routineNum, resp.Status, currentUrl)
 				if resp.Status == "200 OK" {
 					body, err := io.ReadAll(resp.Body)
 					if err == nil {
@@ -65,11 +65,11 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.M
 						}
 						// Check for issues with the page before cataloging
 						if !s.validPage(page) {
-							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since the HTML does not appear valid\n", routineNum, currentUrl)
+							fmt.Printf("<SearchHouseSpider.Crawl(%d) - Skipped %s since the HTML does not appear valid\n", routineNum, currentUrl)
 							continue
 						}
 						if s.duplicateExists(fp, page) {
-							fmt.Printf("<ClubhouseSpider.Crawl(%d) - Skipped %s since it has a near match\n", routineNum, currentUrl)
+							fmt.Printf("<SearchHouseSpider.Crawl(%d) - Skipped %s since it has a near match\n", routineNum, currentUrl)
 							continue
 						}
 						fp.InsertFingerprintsUsingWebpage(page)
@@ -94,7 +94,7 @@ func (s *ClubhouseSpider) Crawl(routineNum int, wg *sync.WaitGroup, ioMu *sync.M
 	}
 }
 
-func (s *ClubhouseSpider) writeToDisk(w WebPage, ioMu *sync.Mutex) {
+func (s *SearchHouseSpider) writeToDisk(w WebPage, ioMu *sync.Mutex) {
 	// Serialize web page to JSON format
 	fileName := s.workingDirectory + "/" + strconv.FormatUint(s.hash(w.Url), 10) + ".json"
 	defer ioMu.Unlock()
@@ -119,7 +119,7 @@ func (s *ClubhouseSpider) writeToDisk(w WebPage, ioMu *sync.Mutex) {
 	}
 }
 
-func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
+func (s *SearchHouseSpider) fileExists(path string) (bool, error) {
 	// https://stackoverflow.com/questions/12518876/how-to-check-if-a-file-exists-in-go
 	if _, err := os.Stat(path); err == nil {
 		return true, nil
@@ -130,7 +130,7 @@ func (s *ClubhouseSpider) fileExists(path string) (bool, error) {
 	}
 }
 
-func (s *ClubhouseSpider) pageDownloaded(url string, ioMu *sync.Mutex) bool {
+func (s *SearchHouseSpider) pageDownloaded(url string, ioMu *sync.Mutex) bool {
 	// Check if a page is downloaded by generating
 	// the corresponding filename and "pinging"
 	// the filesystem
@@ -148,7 +148,7 @@ func (s *ClubhouseSpider) pageDownloaded(url string, ioMu *sync.Mutex) bool {
 	}
 }
 
-func (s *ClubhouseSpider) urlValid(url string) bool {
+func (s *SearchHouseSpider) urlValid(url string) bool {
 	// Return True if a URL is valid, False otherwise
 	// URL must not have fragment (#) and not end
 	// with a non-HTML file extension
@@ -166,7 +166,7 @@ func (s *ClubhouseSpider) urlValid(url string) bool {
 	}
 }
 
-func (s *ClubhouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]string {
+func (s *SearchHouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]string {
 	// Convert regex capturing groups and their
 	// corresponding matches to a hashmap
 	match := r.FindStringSubmatch(str)
@@ -177,7 +177,7 @@ func (s *ClubhouseSpider) regexToMap(r *regexp.Regexp, str string) map[string]st
 	return results
 }
 
-func (s *ClubhouseSpider) findHostName(url string) string {
+func (s *SearchHouseSpider) findHostName(url string) string {
 	// Return the host name from a URL
 	domainRe := regexp.MustCompile(`https://[^\s:/@]+\.[^\s:/@]+`)
 	substr := domainRe.FindAllStringSubmatch(url, -1)
@@ -187,7 +187,7 @@ func (s *ClubhouseSpider) findHostName(url string) string {
 	return substr[0][0]
 }
 
-func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) StringSet {
+func (s *SearchHouseSpider) constructProperURLs(urls []string, root string) StringSet {
 	// Given a list of anchor HREF strings and a
 	// root URL, return a list of proper URLS
 	// (i.e. /clubhouse -> https://mc.com/clubhouse)
@@ -222,7 +222,7 @@ func (s *ClubhouseSpider) constructProperURLs(urls []string, root string) String
 	return properURLs
 }
 
-func (s *ClubhouseSpider) hash(str string) uint64 {
+func (s *SearchHouseSpider) hash(str string) uint64 {
 	// Given a string, return an unsigned int hash
 	h := fnv.New64a()
 	_, err := h.Write([]byte(str))
@@ -232,13 +232,13 @@ func (s *ClubhouseSpider) hash(str string) uint64 {
 	return h.Sum64()
 }
 
-func (s *ClubhouseSpider) calcWebsiteToRoutineNum(url string) int {
+func (s *SearchHouseSpider) calcWebsiteToRoutineNum(url string) int {
 	hostname := s.findHostName(url)
 	hash := s.abs(int(s.hash(hostname)))
 	return hash % s.numRoutines
 }
 
-func (s *ClubhouseSpider) abs(val int) int {
+func (s *SearchHouseSpider) abs(val int) int {
 	if val < 0 {
 		return -1 * val
 	} else {
@@ -246,7 +246,7 @@ func (s *ClubhouseSpider) abs(val int) int {
 	}
 }
 
-func (s *ClubhouseSpider) setSeed(urls []string, ioMu *sync.Mutex) {
+func (s *SearchHouseSpider) setSeed(urls []string, ioMu *sync.Mutex) {
 	// Set the spider's seed by inserting URLs
 	// into the frontier
 	for _, url := range urls {
@@ -256,7 +256,7 @@ func (s *ClubhouseSpider) setSeed(urls []string, ioMu *sync.Mutex) {
 	}
 }
 
-func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
+func (s *SearchHouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
 	fpGlobalSet := fp.GetFingerprintsAsSet()
 	fpWebpageSet := wp.fingerprints.GetFingerprintsAsSet()
 	fp.mu.Lock()
@@ -279,7 +279,7 @@ func (s *ClubhouseSpider) duplicateExists(fp *Fingerprints, wp *WebPage) bool {
 	return false
 }
 
-func (s *ClubhouseSpider) validPage(wp *WebPage) bool {
+func (s *SearchHouseSpider) validPage(wp *WebPage) bool {
 	// Could eventually be expanded into evaluating the page in its
 	// entirety to be valid HTML
 	trimmedBody := strings.TrimLeftFunc(wp.Body, unicode.IsSpace)
