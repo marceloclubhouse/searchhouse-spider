@@ -1,8 +1,8 @@
 package main
 
 import (
-	"clubhouse-spider/spider"
 	"flag"
+	"searchhouse-spider/spider"
 )
 
 func main() {

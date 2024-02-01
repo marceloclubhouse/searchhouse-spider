@@ -1,4 +1,4 @@
-# Clubhouse Spider
+# SearchHouse Spider
 Web crawlers are dime-a-dozen. I built this spider specifically to retrieve web pages
 at a high volume as the beginning of my search engine pipeline.
 
@@ -16,9 +16,9 @@ at a high volume as the beginning of my search engine pipeline.
 
 ## Installation
 ```
-git clone https://github.com/marceloclubhouse/clubhouse-spider
-cd clubhouse-spider
-go install clubhouse-spider
+git clone https://github.com/marceloclubhouse/searchhouse-spider
+cd searchhouse-spider
+go install searchhouse-spider
 go run main.go -h
 ```
 
